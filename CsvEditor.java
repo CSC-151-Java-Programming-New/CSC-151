@@ -18,8 +18,8 @@ public class CsvEditor {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         cardPanel = new JPanel(new CardLayout());
-        mainPanel = new JPanel();
-        editPanel = new JPanel();
+        mainPanel = new JPanel(new BorderLayout());
+        editPanel = new JPanel(new BorderLayout());
 
         // Main panel.
         JButton loadButton = new JButton("Load CSV");
@@ -28,32 +28,64 @@ public class CsvEditor {
         loadButton.addActionListener(e -> openFile());
         editButton.addActionListener(e -> switchToEditPanel());
 
-        mainPanel.add(loadButton);
-        mainPanel.add(editButton);
+        JPanel mainButtonPanel = new JPanel();
+        mainButtonPanel.add(loadButton);
+        mainButtonPanel.add(editButton);
+        mainPanel.add(mainButtonPanel, BorderLayout.NORTH);
 
         // Edit panel.
-        tableModel = new DefaultTableModel();
+        tableModel = new CustomTableModel();
         table = new JTable(tableModel);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         JScrollPane scrollPane = new JScrollPane(table);
+
         JButton saveButton = new JButton("Save CSV");
         JButton addRowButton = new JButton("Add Row");
         JButton addColumnButton = new JButton("Add Column");
+        JButton deleteRowButton = new JButton("Delete Row");
+        JButton deleteColumnButton = new JButton("Delete Column");
 
         saveButton.addActionListener(e -> {
             saveCsv();
             switchToMainPanel();
         });
 
-        addRowButton.addActionListener(e -> tableModel.addRow(new Object[]{}));
-        addColumnButton.addActionListener(e -> tableModel.addColumn("New Column"));
+        addRowButton.addActionListener(e -> {
+            Object[] newRowData = new Object[tableModel.getColumnCount()];
+            for (int i = 0; i < newRowData.length; i++) {
+                newRowData[i] = "";
+            }
+            tableModel.addRow(newRowData);
+        });
+        
+        addColumnButton.addActionListener(e -> {
+            String newColumnName = JOptionPane.showInputDialog("Enter name for new column:");
+            if (newColumnName != null && !newColumnName.trim().isEmpty()) {
+                tableModel.addColumn(newColumnName);
+            }
+        });
 
-        editPanel.setLayout(new BorderLayout());
+        deleteRowButton.addActionListener(e -> {
+            int rowCount = tableModel.getRowCount();
+            if (rowCount > 0) {
+                tableModel.removeRow(rowCount - 1);
+            }
+        });
+
+        deleteColumnButton.addActionListener(e -> {
+            int columnCount = tableModel.getColumnCount();
+            if (columnCount > 0) {
+                tableModel.setColumnCount(columnCount - 1);
+            }
+        });
+
         editPanel.add(scrollPane, BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(addRowButton);
+        buttonPanel.add(deleteRowButton);
         buttonPanel.add(addColumnButton);
+        buttonPanel.add(deleteColumnButton);
         buttonPanel.add(saveButton);
 
         editPanel.add(buttonPanel, BorderLayout.SOUTH);
@@ -82,6 +114,7 @@ public class CsvEditor {
     private static void openFile() {
         JFileChooser fileChooser = new JFileChooser();
         FileNameExtensionFilter filter = new FileNameExtensionFilter("CSV Files", "csv");
+        
         fileChooser.setFileFilter(filter);
         fileChooser.setAcceptAllFileFilterUsed(false);
 
@@ -100,17 +133,14 @@ public class CsvEditor {
 
             if ((line = reader.readLine()) != null) {
                 String[] headers = line.split(",");
-
-                if (tableModel.getColumnCount() == 0) {
-                    for (String header : headers) {
-                        tableModel.addColumn(header);
-                    }
+                for (String header : headers) {
+                    tableModel.addColumn(header);
                 }
 
-                do {
+                while ((line = reader.readLine()) != null) {
                     String[] rowData = line.split(",");
                     tableModel.addRow(rowData);
-                } while ((line = reader.readLine()) != null);
+                }
             }
             adjustColumnWidths();
         } catch (IOException e) {
@@ -145,10 +175,26 @@ public class CsvEditor {
         for (int i = 0; i < tableModel.getColumnCount(); i++) {
             int width = 0;
             for (int j = 0; j < tableModel.getRowCount(); j++) {
-                width = Math.max(width, table.getCellRenderer(j, i).getTableCellRendererComponent(table, 
-                    tableModel.getValueAt(j, i), false, false, j, i).getPreferredSize().width);
+                width = Math.max(width, table.getCellRenderer(j, i)
+                    .getTableCellRendererComponent(table, tableModel.getValueAt(j, i), false, false, j, i)
+                    .getPreferredSize().width);
             }
             table.getColumnModel().getColumn(i).setPreferredWidth(width + 10);
+        }
+    }
+
+    static class CustomTableModel extends DefaultTableModel {
+        @Override
+        public void addColumn(Object columnName) {
+            if (columnName != null && !columnName.toString().trim().isEmpty()) {
+                super.addColumn(columnName);
+            }
+        }
+
+        @Override
+        public Object getValueAt(int row, int column) {
+            Object value = super.getValueAt(row, column);
+            return value == null ? "" : value;
         }
     }
 }
