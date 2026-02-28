@@ -13,7 +13,7 @@ import javax.swing.event.TableModelListener;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 
-public class GroupProject_02DRAFT {
+public class JavaCode_GroupProject_02_WORKING {
     private static String filePath;
     private static JTable table;
     private static DefaultTableModel tableModel;
