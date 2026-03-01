@@ -25,11 +25,14 @@ public class JavaCode_GroupProject_02_POLISHED {
     private static DefaultListModel<String> listModel;
     private static JButton editButton;
     private static JTextField searchField;
+    private static boolean isLoading = false;
+    private static JComboBox<String> sortDropdown;
+    private static java.util.List<Object[]> originalData = new java.util.ArrayList<>();
+    private static java.util.List<String> originalHeaders = new java.util.ArrayList<>();
 
-    // Written by: Alyssa Young –, Bryanna Wilson –, 
+    // Written by: Alyssa Young & Bryanna Wilson – Initializes the GUI components, sets up the layout using CardLayout for screen switching, and defines the primary event listeners for searching and button actions.
     public static void main(String[] args) {
         
-        // Written by: Alyssa Young –
         JFrame frame = new JFrame("NFL Carolina Panthers Team Roster");
         frame.setSize(400, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -37,12 +40,10 @@ public class JavaCode_GroupProject_02_POLISHED {
         cardPanel = new JPanel(new CardLayout());
         mainPanel = new JPanel(new BorderLayout());
         editPanel = new JPanel(new BorderLayout());
-
         listModel = new DefaultListModel<>();
         csvList = new JList<>(listModel);
         JScrollPane listScrollPane = new JScrollPane(csvList);
 
-        // Written by: Alexander Charles – 
         searchField = new JTextField(20);
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             private void update() {
@@ -53,14 +54,12 @@ public class JavaCode_GroupProject_02_POLISHED {
             @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
         });
 
-        // Main panel.
         JButton loadButton = new JButton("Load CSV");
         editButton = new JButton("Edit CSV");
         editButton.setEnabled(false);
 
         Color panthersBlue = new Color(0, 133, 202);
         Color silver = new Color(165, 172, 175);
-
         loadButton.setBackground(silver);
         editButton.setBackground(silver);
 
@@ -72,12 +71,23 @@ public class JavaCode_GroupProject_02_POLISHED {
         mainButtonPanel.add(editButton);
         mainPanel.add(mainButtonPanel, BorderLayout.NORTH);
         
-        // Written by: Alexander Charles – 
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.add(new JLabel("Search: "));
         searchPanel.add(searchField);
         mainPanel.add(searchPanel, BorderLayout.SOUTH);        
         mainPanel.add(listScrollPane, BorderLayout.CENTER);
+        sortDropdown = new JComboBox<>(new String[]{"Sort By..."});
+        sortDropdown.setBackground(Color.WHITE);
+
+        sortDropdown.addActionListener(e -> {
+            String selected = (String) sortDropdown.getSelectedItem();
+            if (selected != null && !isLoading) {
+                sortDataByColumn(selected);
+            }
+        });
+
+        searchPanel.add(new JLabel(" "));
+        searchPanel.add(sortDropdown);
 
         JButton clearButton = new JButton("Clear");
         clearButton.addActionListener(e -> {
@@ -93,9 +103,9 @@ public class JavaCode_GroupProject_02_POLISHED {
         searchLabel.setForeground(Color.WHITE);
         searchLabel.setFont(new Font("Arial", Font.BOLD, 12));
 
-        // Edit panel.
         tableModel = new CustomTableModel();
         table = new JTable(tableModel);
+        table.setAutoCreateRowSorter(true);
 
         table.getColumnModel().addColumnModelListener(new javax.swing.event.TableColumnModelListener() {
            @Override
@@ -118,12 +128,12 @@ public class JavaCode_GroupProject_02_POLISHED {
         table.getModel().addTableModelListener(new TableModelListener() {
             @Override
             public void tableChanged(TableModelEvent e) {
-                if (e.getType() == TableModelEvent.UPDATE) {
-                    int row = e.getFirstRow();
-                    System.out.println("Table data modified. Row: " + row);
-                    adjustRowHeights(table);
-                } else {
-                    adjustRowHeights(table);
+                if (!isLoading) {
+                    if (e.getType() == TableModelEvent.UPDATE) {
+                        adjustRowHeights(table);
+                    } else {
+                        adjustRowHeights(table);
+                    }
                 }
             }
         });
@@ -153,14 +163,10 @@ public class JavaCode_GroupProject_02_POLISHED {
                 else table.getDefaultEditor(table.getColumnClass(table.getEditingColumn())).stopCellEditing();
             }
 
-            System.out.println("Saving data...");
             saveCsv();
-            
             refreshListModel();
-            
             csvList.revalidate();
             csvList.repaint();
-
             switchToMainPanel();
         });
 
@@ -217,7 +223,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         frame.setVisible(true);
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – Manages the transition to the editing interface, enabling the table and triggering the width calculation to ensure column data is readable.
     private static void switchToEditPanel() {
         CardLayout cl = (CardLayout) (cardPanel.getLayout());
         cl.show(cardPanel, "EditPanel");
@@ -225,14 +231,14 @@ public class JavaCode_GroupProject_02_POLISHED {
         adjustColumnWidths();
     }
 
-    // Written by: Alyssa Young – 
+    // Written by: Alyssa Young – Switches the UI back to the main viewing screen and disables table editing to protect data integrity while in view-only mode.
     private static void switchToMainPanel() {
         CardLayout cl = (CardLayout) (cardPanel.getLayout());
         cl.show(cardPanel, "MainPanel");
         table.setEnabled(false);
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Bryanna Wilson & Alyssa Young – Handles the file selection process and triggers the CSV parsing; it also captures a "master copy" of headers and data to allow for the "Reset" feature.
     private static void openFile() {
         JFileChooser fileChooser = new JFileChooser();
         FileNameExtensionFilter filter = new FileNameExtensionFilter("CSV Files", "csv");
@@ -240,31 +246,67 @@ public class JavaCode_GroupProject_02_POLISHED {
         fileChooser.setAcceptAllFileFilterUsed(false);
 
         int userSelection = fileChooser.showOpenDialog(null);
+        
         if (userSelection == JFileChooser.APPROVE_OPTION) {
+            isLoading = true;
             File fileToOpen = fileChooser.getSelectedFile();
             filePath = fileToOpen.getAbsolutePath();
+
+            table.setRowSorter(null);
+            tableModel.setRowCount(0);
+            tableModel.setColumnCount(0);
+            listModel.clear();
+
             boolean ok = loadCsv();
 
             if (ok) {
-                csvList.revalidate();
-                csvList.repaint();
-                table.revalidate();
-                table.repaint();
 
+                tableModel.fireTableStructureChanged();
                 editButton.setEnabled(true);
-                
+
                 SwingUtilities.invokeLater(() -> {
+                    table.setAutoCreateRowSorter(true);
+
+                    originalHeaders.clear();
+                    for (int i = 0; i < tableModel.getColumnCount(); i++) {
+                        originalHeaders.add(tableModel.getColumnName(i));
+                    }
+
+                    originalData.clear();
+                        for (int i = 0; i < tableModel.getRowCount(); i++) {
+                        Object[] row = new Object[tableModel.getColumnCount()];
+                        for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                        row[j] = tableModel.getValueAt(i, j);
+                        }
+                        originalData.add(row);
+                    }
+
+                    refreshListModel();
                     adjustColumnWidths();
                     adjustRowHeights(table);
+
+                    sortDropdown.removeAllItems();
+                    sortDropdown.addItem("Sort By...");
+                    for (int i = 0; i < tableModel.getColumnCount(); i++) {
+                        sortDropdown.addItem(tableModel.getColumnName(i));
+                    }
+                    
+                    csvList.revalidate();
+                    csvList.repaint();
+                    table.revalidate();
+                    table.repaint();
+
+                    isLoading = false;
                     JOptionPane.showMessageDialog(null, "CSV file loaded successfully.");
                 });
             } else {
-                JOptionPane.showMessageDialog(null, "Error loading CSV file.");
+                isLoading = false;
+                JOptionPane.showMessageDialog(null, "Error loading file.");
             }
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – Performs the low-level file reading using BufferedReader to parse CSV lines into headers and row data for the TableModel.
     private static boolean loadCsv() {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -289,22 +331,82 @@ public class JavaCode_GroupProject_02_POLISHED {
                     for (int k = rowData.length; k < padded.length; k++) padded[k] = "";
                     rowData = padded;
                 }
-
                 listModel.addElement(rowData[0]);
                 tableModel.addRow(rowData);
             }
 
-            refreshListModel();
-            adjustColumnWidths();
-            adjustRowHeights(table);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
             return false;
         }
     }
+    
+    // Written by: Alyssa Young – Implements a custom sorting algorithm that handles both alphabetical and numerical data; it also restores the original CSV state when "Sort By..." is selected.
+    private static void sortDataByColumn(String columnName) {
+        if (tableModel.getRowCount() <= 1) return;
 
-    // Written by: Bryanna Wilson – , Alyssa Young –
+        if (columnName.equals("Sort By...")) {
+            isLoading = true;
+            tableModel.setRowCount(0);
+            tableModel.setColumnCount(0);
+
+            for (String header : originalHeaders) {
+                tableModel.addColumn(header);
+            }
+            for (Object[] row : originalData) {
+                tableModel.addRow(row);
+            }
+            isLoading = false;
+            refreshListModel();
+            adjustColumnWidths();
+            adjustRowHeights(table);
+            table.revalidate();
+            table.repaint();
+            return;
+        }
+
+
+        int colIndex = -1;
+        for (int i = 0; i < tableModel.getColumnCount(); i++) {
+            if (tableModel.getColumnName(i).equals(columnName)) {
+                colIndex = i;
+                break;
+            }
+        }
+
+        if (colIndex != -1) {
+            final int finalCol = colIndex;
+            java.util.List<Object[]> data = new java.util.ArrayList<>();
+            for (int i = 0; i < tableModel.getRowCount(); i++) {
+                Object[] row = new Object[tableModel.getColumnCount()];
+                for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                    row[j] = tableModel.getValueAt(i, j);
+                }
+                data.add(row);
+            }
+            data.sort((a, b) -> {
+                String valA = String.valueOf(a[finalCol]).trim();
+                String valB = String.valueOf(b[finalCol]).trim();
+
+                if (valA.matches("\\d+") && valB.matches("\\d+")) {
+                    return Integer.compare(Integer.parseInt(valA), Integer.parseInt(valB));
+                }
+                return valA.compareToIgnoreCase(valB);
+            });
+            isLoading = true;
+            tableModel.setRowCount(0);
+            for (Object[] row : data) {
+                tableModel.addRow(row);
+            }
+            isLoading = false;
+            refreshListModel();
+            table.revalidate();
+            table.repaint();
+        }
+    }
+
+    // Written by: Bryanna Wilson – Creates a modal dialog that displays all field information for a selected player, ensuring the data is presented in a clear, read-only format.
     private static void showDetails(String selectedItem) {
         String[] values = selectedItem.split(", ");
         
@@ -354,7 +456,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – Persists changes back to the physical CSV file by iterating through the TableModel and writing comma-separated values to the file system.
     private static void saveCsv() {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
             for (int i = 0; i < tableModel.getColumnCount(); i++) {
@@ -377,7 +479,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –, Alexander Charles – 
+    // Written by: Alyssa Young & Alexander Charles – Synchronizes the JList on the main screen with the current data in the TableModel, applying search filters in real-time as the user types.
     private static void refreshListModel() {
         listModel.clear();
         String filter = (searchField != null) ? searchField.getText().trim().toLowerCase() : "";
@@ -397,7 +499,7 @@ public class JavaCode_GroupProject_02_POLISHED {
                 for (int j = 0; j < tableModel.getColumnCount(); j++) {
                     rowDisplay.append(tableModel.getValueAt(i, j));
                     if (j < tableModel.getColumnCount() - 1) {
-                        rowDisplay.append(",");
+                        rowDisplay.append(", ");
                     }
                 }
                 listModel.addElement(rowDisplay.toString());
@@ -406,7 +508,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         csvList.setModel(listModel);
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – Dynamically calculates the preferred width of each table column by measuring the rendered size of the text within the cells.
     private static void adjustColumnWidths() {
         for (int i = 0; i < tableModel.getColumnCount(); i++) {
             int width = 0;
@@ -419,8 +521,10 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – Adjusts the height of each row to accommodate multi-line text, ensuring that all data is visible even when cells contain wrapped content.
     private static void adjustRowHeights(JTable table) {
+        if (table.getRowCount() == 0 || table.getColumnCount() == 0) return;
+        
         for (int row = 0; row < table.getRowCount(); row++) {
             int maxHeight = table.getRowHeight();
 
@@ -440,7 +544,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – A custom TableCellRenderer that uses a JTextArea to support word-wrapping and dynamic text rendering within JTable cells.
     static class TextAreaRenderer extends JTextArea implements TableCellRenderer {
         public TextAreaRenderer() {
             setLineWrap(true);
@@ -467,7 +571,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – A custom TableCellEditor that provides a scrollable JTextArea for editing, allowing users to input large amounts of text into a single table cell.
     static class TextAreaEditor extends AbstractCellEditor implements TableCellEditor {
         private final JScrollPane scrollPane;
         private final JTextArea textArea;
@@ -495,7 +599,7 @@ public class JavaCode_GroupProject_02_POLISHED {
         }
     }
 
-    // Written by: Alyssa Young –
+    // Written by: Alyssa Young – A specialized version of DefaultTableModel that ensures empty columns are ignored and null values are handled gracefully during table updates.
     static class CustomTableModel extends DefaultTableModel {
         @Override
         public void addColumn(Object columnName) {
@@ -506,8 +610,8 @@ public class JavaCode_GroupProject_02_POLISHED {
 
         @Override
         public Object getValueAt(int row, int column) {
-            Object value = super.getValueAt(row, column);
-            return value == null ? "" : value;
+            Object val = super.getValueAt(row, column);
+            return (val == null) ? "" : val;
         }
     }
 }
