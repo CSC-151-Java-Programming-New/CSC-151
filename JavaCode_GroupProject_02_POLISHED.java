@@ -1,6 +1,7 @@
-// Members who contributed to the draft:
+// Overall members who contributed to the polished project:
 // Alyssa Young (Aly3673) - Contributed file I/O system and editing function.
 // Bryanna Wilson (wilsonb2742) - Contributed file I/O system, list layout for the main panel, detail panel function, and CSV files with player and staff information.
+// Alexander Charles (aswe344444) - Contributed a search filter for main panel.
 
 import javax.swing.*;
 import java.io.*;
@@ -13,7 +14,7 @@ import javax.swing.event.TableModelListener;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 
-public class GroupProject_02 {
+public class JavaCode_GroupProject_02_POLISHED {
     private static String filePath;
     private static JTable table;
     private static DefaultTableModel tableModel;
@@ -23,8 +24,12 @@ public class GroupProject_02 {
     private static JList<String> csvList;
     private static DefaultListModel<String> listModel;
     private static JButton editButton;
+    private static JTextField searchField;
 
+    // Written by: Alyssa Young –, Bryanna Wilson –, 
     public static void main(String[] args) {
+        
+        // Written by: Alyssa Young –
         JFrame frame = new JFrame("NFL Team Roster");
         frame.setSize(400, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -36,6 +41,17 @@ public class GroupProject_02 {
         listModel = new DefaultListModel<>();
         csvList = new JList<>(listModel);
         JScrollPane listScrollPane = new JScrollPane(csvList);
+
+        // Written by: Alexander Charles – 
+        searchField = new JTextField(20);
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void update() {
+                refreshListModel();
+            }
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+        });
 
         // Main panel.
         JButton loadButton = new JButton("Load CSV");
@@ -49,6 +65,13 @@ public class GroupProject_02 {
         mainButtonPanel.add(loadButton);
         mainButtonPanel.add(editButton);
         mainPanel.add(mainButtonPanel, BorderLayout.NORTH);
+        
+        // Written by: Alexander Charles – 
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.add(new JLabel("Search: "));
+        searchPanel.add(searchField);
+        mainPanel.add(searchPanel, BorderLayout.SOUTH);        
+        
         mainPanel.add(listScrollPane, BorderLayout.CENTER);
 
         // Edit panel.
@@ -175,6 +198,7 @@ public class GroupProject_02 {
         frame.setVisible(true);
     }
 
+    // Written by: Alyssa Young –
     private static void switchToEditPanel() {
         CardLayout cl = (CardLayout) (cardPanel.getLayout());
         cl.show(cardPanel, "EditPanel");
@@ -182,12 +206,14 @@ public class GroupProject_02 {
         adjustColumnWidths();
     }
 
+    // Written by: Alyssa Young – 
     private static void switchToMainPanel() {
         CardLayout cl = (CardLayout) (cardPanel.getLayout());
         cl.show(cardPanel, "MainPanel");
         table.setEnabled(false);
     }
 
+    // Written by: Alyssa Young –
     private static void openFile() {
         JFileChooser fileChooser = new JFileChooser();
         FileNameExtensionFilter filter = new FileNameExtensionFilter("CSV Files", "csv");
@@ -219,6 +245,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –
     private static boolean loadCsv() {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -258,6 +285,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Bryanna Wilson – , Alyssa Young –
     private static void showDetails(String selectedItem) {
         String[] values = selectedItem.split(", ");
         
@@ -294,7 +322,6 @@ public class GroupProject_02 {
 
             JButton okButton = new JButton("OK");
             okButton.addActionListener(e -> dialog.dispose());
-
             JPanel buttonPanel = new JPanel();
             buttonPanel.add(okButton);
             dialog.add(buttonPanel, BorderLayout.SOUTH);
@@ -304,10 +331,11 @@ public class GroupProject_02 {
             dialog.setLocationRelativeTo(null);
             dialog.setVisible(true);
         } else {
-            JOptionPane.showMessageDialog(null, "No details available.");
+            JOptionPane.showMessageDialog(null, "Error reading details.");
         }
     }
 
+    // Written by: Alyssa Young –
     private static void saveCsv() {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
             for (int i = 0; i < tableModel.getColumnCount(); i++) {
@@ -330,21 +358,27 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –, Alexander Charles – 
     private static void refreshListModel() {
         listModel.clear();
+        String filter = (searchField != null) ? searchField.getText().trim().toLowerCase() : "";
         for (int i = 0; i < tableModel.getRowCount(); i++) {
-            StringBuilder rowDisplay = new StringBuilder();
-            for (int j = 0; j < tableModel.getColumnCount(); j++) {
-                rowDisplay.append(tableModel.getValueAt(i, j));
-                if (j < tableModel.getColumnCount() - 1) {
-                    rowDisplay.append(", ");
+            String name = String.valueOf(tableModel.getValueAt(i, 0));
+            if (filter.isEmpty() || name.toLowerCase().contains(filter)) {
+                StringBuilder rowDisplay = new StringBuilder();
+                for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                    rowDisplay.append(tableModel.getValueAt(i, j));
+                    if (j < tableModel.getColumnCount() - 1) {
+                        rowDisplay.append(", ");
+                    }
                 }
-            }
             listModel.addElement(rowDisplay.toString());
+            }
         }
         csvList.setModel(listModel);
     }
 
+    // Written by: Alyssa Young –
     private static void adjustColumnWidths() {
         for (int i = 0; i < tableModel.getColumnCount(); i++) {
             int width = 0;
@@ -357,6 +391,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –
     private static void adjustRowHeights(JTable table) {
         for (int row = 0; row < table.getRowCount(); row++) {
             int maxHeight = table.getRowHeight();
@@ -377,6 +412,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –
     static class TextAreaRenderer extends JTextArea implements TableCellRenderer {
         public TextAreaRenderer() {
             setLineWrap(true);
@@ -403,6 +439,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –
     static class TextAreaEditor extends AbstractCellEditor implements TableCellEditor {
         private final JScrollPane scrollPane;
         private final JTextArea textArea;
@@ -430,6 +467,7 @@ public class GroupProject_02 {
         }
     }
 
+    // Written by: Alyssa Young –
     static class CustomTableModel extends DefaultTableModel {
         @Override
         public void addColumn(Object columnName) {
