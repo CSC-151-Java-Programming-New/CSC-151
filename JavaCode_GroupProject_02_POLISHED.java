@@ -30,7 +30,7 @@ public class JavaCode_GroupProject_02_POLISHED {
     public static void main(String[] args) {
         
         // Written by: Alyssa Young –
-        JFrame frame = new JFrame("NFL Team Roster");
+        JFrame frame = new JFrame("NFL Carolina Panthers Team Roster");
         frame.setSize(400, 400);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -58,6 +58,12 @@ public class JavaCode_GroupProject_02_POLISHED {
         editButton = new JButton("Edit CSV");
         editButton.setEnabled(false);
 
+        Color panthersBlue = new Color(0, 133, 202);
+        Color silver = new Color(165, 172, 175);
+
+        loadButton.setBackground(silver);
+        editButton.setBackground(silver);
+
         loadButton.addActionListener(e -> openFile());
         editButton.addActionListener(e -> switchToEditPanel());
 
@@ -71,8 +77,21 @@ public class JavaCode_GroupProject_02_POLISHED {
         searchPanel.add(new JLabel("Search: "));
         searchPanel.add(searchField);
         mainPanel.add(searchPanel, BorderLayout.SOUTH);        
-        
         mainPanel.add(listScrollPane, BorderLayout.CENTER);
+
+        JButton clearButton = new JButton("Clear");
+        clearButton.addActionListener(e -> {
+            searchField.setText("");
+        });
+        searchPanel.add(clearButton);
+
+        mainButtonPanel.setBackground(panthersBlue);
+        searchPanel.setBackground(panthersBlue);
+        clearButton.setBackground(silver);
+        
+        JLabel searchLabel = new JLabel("Search: ");
+        searchLabel.setForeground(Color.WHITE);
+        searchLabel.setFont(new Font("Arial", Font.BOLD, 12));
 
         // Edit panel.
         tableModel = new CustomTableModel();
@@ -363,16 +382,25 @@ public class JavaCode_GroupProject_02_POLISHED {
         listModel.clear();
         String filter = (searchField != null) ? searchField.getText().trim().toLowerCase() : "";
         for (int i = 0; i < tableModel.getRowCount(); i++) {
-            String name = String.valueOf(tableModel.getValueAt(i, 0));
-            if (filter.isEmpty() || name.toLowerCase().contains(filter)) {
+            boolean matchFound = false;
+
+            for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                String cellValue = String.valueOf(tableModel.getValueAt(i, j)).toLowerCase();
+                if (cellValue.contains(filter)) {
+                    matchFound = true;
+                    break;
+                }
+            }
+
+            if (filter.isEmpty() || matchFound) {
                 StringBuilder rowDisplay = new StringBuilder();
                 for (int j = 0; j < tableModel.getColumnCount(); j++) {
                     rowDisplay.append(tableModel.getValueAt(i, j));
                     if (j < tableModel.getColumnCount() - 1) {
-                        rowDisplay.append(", ");
+                        rowDisplay.append(",");
                     }
                 }
-            listModel.addElement(rowDisplay.toString());
+                listModel.addElement(rowDisplay.toString());
             }
         }
         csvList.setModel(listModel);
